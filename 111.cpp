@@ -19,7 +19,7 @@ const sf::Color PURPLE(128, 0, 128);
 class SortVisualizer {
 private:
     std::vector<int> arr;
-    sf::RenderWindow *window;
+    sf::RenderWindow window;
     sf::Font font;
     std::string currentAlgorithm;
     int comparisons;
@@ -30,16 +30,14 @@ private:
     std::vector<int> initialArray;
 
     void drawBars(int highlight1 = -1, int highlight2 = -1) {
-        if (!graphicalMode || window == nullptr) return;
-
-        window->clear(sf::Color::Black);
+        window.clear(sf::Color::Black);
 
         float barWidth = static_cast<float>(WINDOW_WIDTH) / arr.size();
-        float scaleFactor = static_cast<float>(WINDOW_HEIGHT) / *std::max_element(arr.begin(), arr.end());
+        float scaleFactor = static_cast<float>(WINDOW_HEIGHT - 100) / *std::max_element(arr.begin(), arr.end());
 
         for (size_t i = 0; i < arr.size(); ++i) {
             sf::RectangleShape bar(sf::Vector2f(barWidth - 1, arr[i] * scaleFactor));
-            bar.setPosition(i * barWidth, WINDOW_HEIGHT - arr[i] * scaleFactor);
+            bar.setPosition(i * barWidth, WINDOW_HEIGHT - arr[i] * scaleFactor - 50);
 
             if (i == highlight1 || i == highlight2) {
                 bar.setFillColor(sf::Color::Red);
@@ -47,22 +45,29 @@ private:
                 bar.setFillColor(PURPLE);
             }
 
-            window->draw(bar);
+            window.draw(bar);
+
+            sf::Text valueText;
+            valueText.setFont(font);
+            valueText.setString(std::to_string(arr[i]));
+            valueText.setCharacterSize(12);
+            valueText.setFillColor(sf::Color::White);
+            valueText.setPosition(i * barWidth, WINDOW_HEIGHT - arr[i] * scaleFactor - 70);
+            window.draw(valueText);
         }
 
         drawStats();
-        window->display();
+        window.display();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Slow down the animation
     }
 
     void drawStats() {
-        if (!graphicalMode || window == nullptr) return;
-
         std::ostringstream stats;
         stats << "Algorithm: " << currentAlgorithm << "\n"
-                << "Comparisons: " << comparisons << "\n"
-                << "Swaps: " << swaps << "\n"
-                << "Time: " << std::fixed << std::setprecision(2)
-                << std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count() << "s";
+              << "Comparisons: " << comparisons << "\n"
+              << "Swaps: " << swaps << "\n"
+              << "Time: " << std::fixed << std::setprecision(2)
+              << std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count() << "s";
 
         sf::Text statsText;
         statsText.setFont(font);
@@ -70,7 +75,7 @@ private:
         statsText.setCharacterSize(20);
         statsText.setFillColor(sf::Color::White);
         statsText.setPosition(10, 10);
-        window->draw(statsText);
+        window.draw(statsText);
     }
 
     void swap(int &a, int &b) {
@@ -95,33 +100,25 @@ private:
     }
 
     void displayTextStats() {
-        if (graphicalMode) return;
-
         std::cout << "Algorithm: " << currentAlgorithm << " | "
-                << "Comparisons: " << comparisons << " | "
-                << "Swaps: " << swaps << " | "
-                << "Time: " << std::fixed << std::setprecision(2)
-                << std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count() << "s\n";
+                  << "Comparisons: " << comparisons << " | "
+                  << "Swaps: " << swaps << " | "
+                  << "Time: " << std::fixed << std::setprecision(2)
+                  << std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count() << "s\n";
     }
 
 public:
-    SortVisualizer() : window(nullptr), sorting(false), graphicalMode(false) {
+    SortVisualizer() : sorting(false), graphicalMode(false) {
         if (!font.loadFromFile("arial.ttf")) {
             std::cout << "Error loading font" << std::endl;
         }
     }
 
-    ~SortVisualizer() {
-        if (window != nullptr) {
-            delete window;
-        }
-    }
-
     void setGraphicalMode(bool mode) {
         graphicalMode = mode;
-        if (graphicalMode && window == nullptr) {
-            window = new sf::RenderWindow(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Optimized Sorting Visualizer");
-            window->setFramerateLimit(60);
+        if (graphicalMode) {
+            window.create(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Fixed Sorting Visualizer");
+            window.setFramerateLimit(60);
         }
     }
 
@@ -158,18 +155,22 @@ public:
         }
 
         for (size_t i = 0; i < arr.size() && sorting; ++i) {
+            bool swapped = false;
             for (size_t j = 0; j < arr.size() - i - 1 && sorting; ++j) {
                 comparisons++;
-                if (graphicalMode) {
-                    drawBars(j, j + 1);
-                } else {
-                    displayTextArray(arr, "Current array");
-                    displayTextStats();
-                }
                 if (arr[j] > arr[j + 1]) {
                     swap(arr[j], arr[j + 1]);
+                    swapped = true;
+                }
+                if (graphicalMode) {
+                    drawBars(j, j + 1);
                 }
             }
+            if (!graphicalMode) {
+                displayTextArray(arr, "Current array");
+                displayTextStats();
+            }
+            if (!swapped) break;
         }
         if (graphicalMode) {
             drawBars();
@@ -194,18 +195,19 @@ public:
 
         for (int j = low; j <= high - 1 && sorting; ++j) {
             comparisons++;
-            if (graphicalMode) {
-                drawBars(j, high);
-            } else {
-                displayTextArray(arr, "Current array");
-                displayTextStats();
-            }
             if (arr[j] < pivot) {
                 ++i;
                 swap(arr[i], arr[j]);
             }
+            if (graphicalMode) {
+                drawBars(j, high);
+            }
         }
         swap(arr[i + 1], arr[high]);
+        if (!graphicalMode) {
+            displayTextArray(arr, "Current array");
+            displayTextStats();
+        }
         return i + 1;
     }
 
@@ -238,22 +240,23 @@ public:
             displayTextArray(initialArray, "Initial array");
         }
 
-        for (size_t i = 0; i < arr.size() && sorting; ++i) {
+        for (size_t i = 0; i < arr.size() - 1 && sorting; ++i) {
             size_t minIdx = i;
             for (size_t j = i + 1; j < arr.size() && sorting; ++j) {
                 comparisons++;
-                if (graphicalMode) {
-                    drawBars(minIdx, j);
-                } else {
-                    displayTextArray(arr, "Current array");
-                    displayTextStats();
-                }
                 if (arr[j] < arr[minIdx]) {
                     minIdx = j;
+                }
+                if (graphicalMode) {
+                    drawBars(i, j);
                 }
             }
             if (minIdx != i) {
                 swap(arr[i], arr[minIdx]);
+            }
+            if (!graphicalMode) {
+                displayTextArray(arr, "Current array");
+                displayTextStats();
             }
         }
         if (graphicalMode) {
@@ -265,8 +268,8 @@ public:
         sorting = false;
     }
 
-    void insertionSort() {
-        currentAlgorithm = "Insertion Sort";
+    void shellSort() {
+        currentAlgorithm = "Shell Sort";
         resetStats();
         sorting = true;
 
@@ -274,22 +277,24 @@ public:
             displayTextArray(initialArray, "Initial array");
         }
 
-        for (size_t i = 1; i < arr.size() && sorting; ++i) {
-            int key = arr[i];
-            int j = i - 1;
-            while (j >= 0 && arr[j] > key && sorting) {
-                comparisons++;
-                if (graphicalMode) {
-                    drawBars(j, j + 1);
-                } else {
-                    displayTextArray(arr, "Current array");
-                    displayTextStats();
+        for (int gap = arr.size() / 2; gap > 0 && sorting; gap /= 2) {
+            for (int i = gap; i < arr.size() && sorting; i++) {
+                int temp = arr[i];
+                int j;
+                for (j = i; j >= gap && arr[j - gap] > temp && sorting; j -= gap) {
+                    comparisons++;
+                    arr[j] = arr[j - gap];
+                    swaps++;
+                    if (graphicalMode) {
+                        drawBars(j, j - gap);
+                    }
                 }
-                arr[j + 1] = arr[j];
-                swaps++;
-                j--;
+                arr[j] = temp;
             }
-            arr[j + 1] = key;
+            if (!graphicalMode) {
+                displayTextArray(arr, "Current array");
+                displayTextStats();
+            }
         }
         if (graphicalMode) {
             drawBars();
@@ -301,30 +306,50 @@ public:
     }
 
     void handleEvents() {
-        if (!graphicalMode || window == nullptr) return;
-
         sf::Event event;
-        while (window->pollEvent(event)) {
+        while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
-                window->close();
+                window.close();
 
             if (event.type == sf::Event::KeyPressed) {
                 if (event.key.code == sf::Keyboard::Space) {
                     sorting = false;
                 }
                 if (event.key.code == sf::Keyboard::Escape) {
-                    window->close();
+                    window.close();
                 }
             }
         }
     }
 
-    void run() {
-        if (graphicalMode && window != nullptr) {
-            while (window->isOpen()) {
-                handleEvents();
+    void drawMenu() {
+        sf::Text menuText;
+        menuText.setFont(font);
+        menuText.setCharacterSize(20);
+        menuText.setFillColor(sf::Color::White);
+        menuText.setPosition(10, WINDOW_HEIGHT - 40);
+        menuText.setString("1: Bubble | 2: Quick | 3: Selection | 4: Shell | 5: Reset | ESC: Exit");
+        window.draw(menuText);
+    }
 
-                if (!sorting && !arr.empty()) {
+    void run() {
+        if (!graphicalMode) return;
+
+        while (window.isOpen()) {
+            handleEvents();
+
+            if (!sorting) {
+                window.clear(sf::Color::Black);
+                drawBars();
+                drawMenu();
+                window.display();
+
+                if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num1)) bubbleSort();
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num2)) runQuickSort();
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num3)) selectionSort();
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num4)) shellSort();
+                else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num5)) {
+                    arr = initialArray;
                     drawBars();
                 }
             }
@@ -335,16 +360,6 @@ public:
         arr = initialArray;
     }
 };
-
-void printInstructions() {
-    std::cout << "Select sorting algorithm:" << std::endl;
-    std::cout << "  1 - Bubble Sort" << std::endl;
-    std::cout << "  2 - Quick Sort" << std::endl;
-    std::cout << "  3 - Selection Sort" << std::endl;
-    std::cout << "  4 - Insertion Sort" << std::endl;
-    std::cout << "  5 - Reset array" << std::endl;
-    std::cout << "  0 - Exit program" << std::endl;
-}
 
 int main() {
     SortVisualizer visualizer;
@@ -369,38 +384,30 @@ int main() {
         visualizer.getUserInput(10);
     }
 
-    int choice;
-    do {
-        printInstructions();
-        std::cin >> choice;
-
-        switch (choice) {
-            case 1:
-                visualizer.bubbleSort();
-                break;
-            case 2:
-                visualizer.runQuickSort();
-                break;
-            case 3:
-                visualizer.selectionSort();
-                break;
-            case 4:
-                visualizer.insertionSort();
-                break;
-            case 5:
-                visualizer.reset();
-                std::cout << "Array reset to initial state." << std::endl;
-                break;
-            case 0:
-                std::cout << "Exiting program." << std::endl;
-                break;
-            default:
-                std::cout << "Invalid choice. Please try again." << std::endl;
-        }
-    } while (choice != 0);
-
     if (displayMode == 1) {
         visualizer.run();
+    } else {
+        int choice;
+        do {
+            std::cout << "\nSelect sorting algorithm:" << std::endl;
+            std::cout << "1 - Bubble Sort" << std::endl;
+            std::cout << "2 - Quick Sort" << std::endl;
+            std::cout << "3 - Selection Sort" << std::endl;
+            std::cout << "4 - Shell Sort" << std::endl;
+            std::cout << "5 - Reset array" << std::endl;
+            std::cout << "0 - Exit program" << std::endl;
+            std::cin >> choice;
+
+            switch (choice) {
+                case 1: visualizer.bubbleSort(); break;
+                case 2: visualizer.runQuickSort(); break;
+                case 3: visualizer.selectionSort(); break;
+                case 4: visualizer.shellSort(); break;
+                case 5: visualizer.reset(); std::cout << "Array reset to initial state." << std::endl; break;
+                case 0: std::cout << "Exiting program." << std::endl; break;
+                default: std::cout << "Invalid choice. Please try again." << std::endl;
+            }
+        } while (choice != 0);
     }
 
     return 0;
